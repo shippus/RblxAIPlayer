@@ -4,20 +4,34 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
 
-local key -- This is given a value through a remote event from the client, so that it isn't hardcoded in the script. It doesn't save between sessions.
+local playerKeys = {}
+local playerHistory = {}
 
 local setKeyEvent = rs.setKey
 
-local conversationHistory = {
-	{
-		role = "system",
-		content = "You are a friendly AI player in a Roblox game. Keep replies short.",
-	},
+local systemPrompt = "You are a helpful assistant in a Roblox game. Keep replies short and relevant to the game context."
+
+local SYSTEM_MESSAGE = {
+	role = "system",
+	content = systemPrompt,
 }
 
-local function callProvider(messages)
-	if not key then return nil end
+setKeyEvent.OnServerEvent:Connect(function(player, newKey)
+	if typeof(newKey) ~= "string" then
+		warn("[AIPlayer] Invalid key type from " .. player.Name)
+		return
+	end
 
+	playerKeys[player] = newKey
+	print("[AIPlayer] API key set by " .. player.Name)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	playerKeys[player] = nil
+	playerHistory[player] = nil
+end)
+
+local function callProvider(key, messages)
 	local ok, result = pcall(function()
 		return HttpService:RequestAsync({
 			Url = "https://api.openai.com/v1/chat/completions",
@@ -50,26 +64,30 @@ end
 
 Players.PlayerAdded:Connect(function(player)
 	player.Chatted:Connect(function(message)
+		local key = playerKeys[player]
 		if not key then return end
 
-		conversationHistory[#conversationHistory + 1] = {
+		if not playerHistory[player] then
+			playerHistory[player] = { SYSTEM_MESSAGE }
+		end
+		local history = playerHistory[player]
+
+		history[#history + 1] = {
 			role = "user",
 			content = string.format("[%s]: %s", player.Name, message),
 		}
-
-		-- Keep history bounded; always preserve the system prompt at index 1.
-		while #conversationHistory > 21 do
-			table.remove(conversationHistory, 2)
+		while #history > 21 do
+			table.remove(history, 2)
 		end
 
-		local reply = callProvider(conversationHistory)
+		local reply = callProvider(key, history)
 		if not reply then return end
 
-		conversationHistory[#conversationHistory + 1] = {
+		history[#history + 1] = {
 			role = "assistant",
 			content = reply,
 		}
 
-		aiResponseEvent:FireAllClients(reply)
+		-- Here we output the AI reply, i'll implement this later.
 	end)
 end)
