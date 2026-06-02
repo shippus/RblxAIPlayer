@@ -6,3 +6,7 @@
 /*.rbxl.lock
 
 sourcemap.json
+*.env
+
+# Ignore demo specific scripts.
+src/client/ui.client.luau

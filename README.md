@@ -6,3 +6,6 @@ Git clone this repository for the scripts, and if you want the demo game you can
 
 ### Rojo
 For more help, check out [the Rojo documentation](https://rojo.space/docs).
+
+# Progress
+I just started lol
